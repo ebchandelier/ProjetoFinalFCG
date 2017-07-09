@@ -121,7 +121,7 @@ bool goingBackwarding = false;
 bool goingRight = false;
 bool goingLeft = false;
 
-int bestTime = 0;
+int bestTime = 999;
 int currentTime = 0;
 
 float gravity = -0.001;
@@ -502,10 +502,11 @@ int main(int argc, char* argv[])
 
         if(isBallTouchingTheBunny()) {
         
-            if(bestTime<currentTime) {
+            if(bestTime>currentTime) {
             
                 bestTime = currentTime;
             }
+            currentTime=0;
             setModelBallToStart();
         }
 
