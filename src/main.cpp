@@ -66,6 +66,7 @@ GLuint CreateGpuProgram(GLuint vertex_shader_id, GLuint fragment_shader_id); // 
 void PrintObjModelInfo(ObjModel*); // Função para debugging
 void LoadTextureImage(const char* filename);
 
+void TextRendering_ShowFramesPerSecond(GLFWwindow* window);
 // Declaração de funções auxiliares para renderizar texto dentro da janela
 // OpenGL. Estas funções estão definidas no arquivo "textrendering.cpp".
 void TextRendering_Init();
@@ -99,6 +100,7 @@ bool isModelsTouchingEachOther();
 bool verifyIntersectionWithPlaneOk(ObjModel* model);
 void performAllFoces(ObjModel *model);
 glm::vec4 changeBase(glm::mat4 matrix, glm::vec4 vector);
+float distanceBetweenPoints(float Ax, float Ay, float Bx, float By);
 // Definimos uma estrutura que armazenará dados necessários para renderizar
 // cada objeto da cena virtual.
 struct SceneObject
@@ -112,11 +114,15 @@ struct SceneObject
     glm::vec3    bbox_max;
 };
 
+bool expertMode = false;
+
 bool goingForwarding = false;
 bool goingBackwarding = false;
 bool goingRight = false;
 bool goingLeft = false;
 
+int bestTime = 0;
+int currentTime = 0;
 
 float gravity = -0.001;
 glm::vec3 velocity = glm::vec3(0.0, 0.0, 0.0);
@@ -127,7 +133,25 @@ bool modelBallATouchingSomething = false;
 
 glm::mat4 modelBallA = Matrix_Identity();
 glm::mat4 modelBallB = Matrix_Identity() * Matrix_Translate(-2.0, 0.0, -2.0);
-glm::mat4 modelPlane = Matrix_Identity() * Matrix_Scale(10.0f, 1.0f, 10.0f);
+glm::mat4 modelPlane = Matrix_Identity() * Matrix_Scale(10.0f, 0.01f, 10.0f);
+glm::mat4 modelCow = Matrix_Identity() * Matrix_Translate(1.0, 1.0, -1.0) * Matrix_Scale(10.0f, 10.0f, 10.0f);
+glm::mat4 modelBunny;
+
+void setModelBallToStart() {
+ 
+    modelBallA[3][0] = -9.2;
+    modelBallA[3][2] = 1.18;
+    velocity = glm::vec3(0.0, 0.0, 0.0);
+}
+
+bool isBallTouchingTheBunny() {
+    float distance = distanceBetweenPoints(modelBallA[3][0] , modelBallA[3][2], modelBunny[3][0], modelBunny[3][2]); 
+    if(distance <= 1.0) {
+    
+        return true;
+    }
+    return false;
+}
 
 // A cena virtual é uma lista de objetos nomeados, guardados em um dicionário
 // (map).  Veja dentro da função BuildTrianglesAndAddToVirtualScene() como que são incluídos
@@ -204,8 +228,66 @@ GLint bbox_max_uniform;
 // Número de texturas carregadas pela função LoadTextureImage()
 GLuint g_NumLoadedTextures = 0;
 
+
+std::vector<glm::vec4> walls; 
+
+float distanceBetweenPoints(float Ax, float Ay, float Bx, float By) {
+
+    float x = pow(Ax - Bx, 2);
+    float y = pow(Ay - By, 2);
+    return sqrt(x+y);
+}
+
+bool isBallTouchingThisWall(float Ax, float Ay, float Bx, float By) {
+
+    float wallSize = distanceBetweenPoints(Ax, Ay, Bx, By);
+    float cornerABallDistance = distanceBetweenPoints(Ax, Ay, modelBallA[3][0], modelBallA[3][2]);
+    float cornerBBallDistance = distanceBetweenPoints(Bx, By,modelBallA[3][0], modelBallA[3][2]);
+   
+    if(wallSize + 0.01 >= cornerABallDistance + cornerBBallDistance) {
+        return true;
+    }
+    return false;
+} 
+
+bool isBallTouchingAWall() {
+
+    for(glm::vec4 wall : walls) {
+        
+        if(isBallTouchingThisWall(wall[0],wall[1],wall[2],wall[3])) {
+        
+            //std::cout << "touch\n";
+            return true;
+        }
+    }
+    //std::cout << "not touch\n";
+    return false;
+} 
+
 int main(int argc, char* argv[])
 {
+
+    walls.push_back(glm::vec4(-7.65, 9.22, -7.65, 0.21));
+    walls.push_back(glm::vec4(-7.6, -3.62, -7.6, -9.8));
+    walls.push_back(glm::vec4(-7.26, -6.93, 6.89, -7.0));
+    walls.push_back(glm::vec4(7.22, -6.93, 7.21, 2.84));
+    walls.push_back(glm::vec4(7.21, 2.84, 4.8, 2.8));
+    walls.push_back(glm::vec4(4.8, 2.8, 4.56, -3.4));
+    walls.push_back(glm::vec4(4.56, -3.4, -5.37, -3.65));
+    walls.push_back(glm::vec4(-0.22, -0.32, -0.1, -3.34));
+    walls.push_back(glm::vec4(-4.9, 6.27, -0.13, 6.31));
+    walls.push_back(glm::vec4(-4.93, 3.06, -5.08, -0.32));
+    walls.push_back(glm::vec4(-5.08, -0.32, -2.58, -0.19));
+    walls.push_back(glm::vec4(-2.58, -0.19, -2.61, 2.96));
+    walls.push_back(glm::vec4(-2.61, 2.96, 2.25, 2.88));
+    walls.push_back(glm::vec4(2.35, -0.33, 2.34, 6.2));
+    walls.push_back(glm::vec4(2.34, 6.2, 7.42, 6.36));
+    walls.push_back(glm::vec4(4.81, 6.39, 4.75, 9.44));
+    walls.push_back(glm::vec4(-10.0, 10.0, -10.0, -10.0));
+    walls.push_back(glm::vec4(-10.0, -10.0, 10.0, -10.0));
+    walls.push_back(glm::vec4(10.0,-10.0, 10.0, 10.0));
+    walls.push_back(glm::vec4(10.0, 10.0, -10.0, 10.0));
+
     modelBallA = modelBallA * Matrix_Translate(2.0, 1.0, 2.0);
     // Inicializamos a biblioteca GLFW, utilizada para criar uma janela do
     // sistema operacional, onde poderemos renderizar com a OpenGL.
@@ -275,8 +357,10 @@ int main(int argc, char* argv[])
     LoadShadersFromFiles();
 
     // Carregamos duas imagens para serem utilizadas como textura
-    LoadTextureImage("../../data/tc-earth_daymap_surface.jpg");      // TextureImage0
-    LoadTextureImage("../../data/tc-earth_nightmap_citylights.gif"); // TextureImage1
+    LoadTextureImage("../../data/bunny.jpg");      // TextureImage0
+    LoadTextureImage("../../data/evilbunny.jpg"); // TextureImage1
+    LoadTextureImage("../../data/maze.gif");//TextureImage2
+    LoadTextureImage("../../data/maze_expert.gif");//TextureImage2
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
     ObjModel spheremodel("../../data/sphere.obj");
@@ -287,14 +371,18 @@ int main(int argc, char* argv[])
     ComputeNormals(&spheremodel2);
     BuildTrianglesAndAddToVirtualScene(&spheremodel2);
 
-/*
+
     ObjModel bunnymodel("../../data/bunny.obj");
     ComputeNormals(&bunnymodel);
     BuildTrianglesAndAddToVirtualScene(&bunnymodel);
-*/
+
     ObjModel planemodel("../../data/plane.obj");
     ComputeNormals(&planemodel);
     BuildTrianglesAndAddToVirtualScene(&planemodel);
+    
+    ObjModel cowmodel("../../data/cow.obj");
+    ComputeNormals(&cowmodel);
+    BuildTrianglesAndAddToVirtualScene(&cowmodel);
 
     if ( argc > 1 )
     {
@@ -319,11 +407,13 @@ int main(int argc, char* argv[])
     glm::mat4 the_model;
     glm::mat4 the_view;
 
+    setModelBallToStart();
 
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
         // Aqui executamos as operações de renderização
+    
 
         // Definimos a cor do "fundo" do framebuffer como branco.  Tal cor é
         // definida como coeficientes RGBA: Red, Green, Blue, Alpha; isto é:
@@ -331,7 +421,7 @@ int main(int argc, char* argv[])
         // Conversaremos sobre sistemas de cores nas aulas de Rasterização.
         //
         //           R     G     B     A
-        glClearColor(0.0f, 0.0f, 0.2f, 1.0f);
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
         // "Pintamos" todos os pixels do framebuffer com a cor definida acima,
         // e também resetamos todos os pixels do Z-buffer (depth buffer).
@@ -404,10 +494,32 @@ int main(int argc, char* argv[])
         #define SPHERE 0
         #define BUNNY  1
         #define PLANE  2
+        #define COW 3
 
 
         //VERY IMPORTANT FUNCTION
         performAllFoces(&spheremodel);
+
+        if(isBallTouchingTheBunny()) {
+        
+            if(bestTime<currentTime) {
+            
+                bestTime = currentTime;
+            }
+            setModelBallToStart();
+        }
+
+        if(isBallTouchingAWall()) {
+        
+            currentTime = 0;
+            setModelBallToStart();
+        }
+        
+
+        //std::cout << modelBallA[3][0] << " " << modelBallA[3][1] << " " << modelBallA[3][2] << "\n";
+        //beggins at x=-9.2 z=1.18
+        //x=-7.65 z= 9.22
+        //x=-7.65 z= =0.21
 
 
         //modelBallA = modelBallA +
@@ -420,16 +532,49 @@ int main(int argc, char* argv[])
         glUniform1i(object_id_uniform, SPHERE);
         DrawVirtualObject("sphere");
 
+        modelBunny = Matrix_Identity() * Matrix_Translate(8.7, 1.0, -1.67);
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(modelBunny));
+        glUniform1i(object_id_uniform, BUNNY);
+        DrawVirtualObject("bunny");
 
         //DESENHANDO O PLANO
-        //modelPlane = Matrix_Translate(0.0f,0.0f,0.0f);// * Matrix_Scale(100.0f, 1.0f, 100.0f);
+        //modelPlane = Matrix_Translate(0.0f, 0.0f,0.0f);// * Matrix_Scale(10.0f, 0.0f, 10.0f);
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(modelPlane));
         glUniform1i(object_id_uniform, PLANE);
         DrawVirtualObject("plane");
+        
+        //modelCow
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(modelCow));
+        glUniform1i(object_id_uniform, COW);
+        DrawVirtualObject("cow");
+        
 
+        //const std::string pointsString = std::to_string(hits);
+        //std::cout << pointsString << "\n";
+        //TextRendering_PrintString(window, pointsString, 0.10f, 0.10f, 1.0f);
+
+        TextRendering_ShowFramesPerSecond(window);
 
         glfwSwapBuffers(window);
-
+        
+        
+        //this is a kind of poll event
+        if(currentTime%10 ==0) {
+            
+            if(expertMode == true) {
+            
+                expertMode = false;
+                LoadShadersFromFiles();
+            }
+        
+        } else {
+            
+            if(expertMode == false) {
+            
+                expertMode = true;
+                LoadShadersFromFiles();
+            }
+        }
 
         glfwPollEvents();
     }
@@ -497,6 +642,7 @@ void LoadTextureImage(const char* filename)
 // dos objetos na função BuildTrianglesAndAddToVirtualScene().
 void DrawVirtualObject(const char* object_name)
 {
+    //std::cout << object_name << "\n";
     // "Ligamos" o VAO. Informamos que queremos utilizar os atributos de
     // vértices apontados pelo VAO criado pela função BuildTrianglesAndAddToVirtualScene(). Veja
     // comentários detalhados dentro da definição de BuildTrianglesAndAddToVirtualScene().
@@ -574,7 +720,8 @@ void LoadShadersFromFiles()
     glUseProgram(program_id);
     glUniform1i(glGetUniformLocation(program_id, "TextureImage0"), 0);
     glUniform1i(glGetUniformLocation(program_id, "TextureImage1"), 1);
-    glUniform1i(glGetUniformLocation(program_id, "TextureImage2"), 2);
+    if(!expertMode) glUniform1i(glGetUniformLocation(program_id, "TextureImage2"), 2);
+    else glUniform1i(glGetUniformLocation(program_id, "TextureImage2"), 3);
     glUseProgram(0);
 }
 
@@ -766,19 +913,6 @@ void BuildTrianglesAndAddToVirtualScene(ObjModel* model)
     glGenVertexArrays(1, &vertex_array_object_id);
     glBindVertexArray(vertex_array_object_id);
 
-/*
-    GLuint tex;
-    glGenTextures(1, &tex);
-    glBindTexture(GL_TEXTURE_2D, tex);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    float pixels[] = {
-    0.0f, 0.0f, 0.0f,   1.0f, 1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f,   0.0f, 0.0f, 0.0f
-    };
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 2, 2, 0, GL_RGB, GL_FLOAT, pixels);
-*/
-
     std::vector<GLuint> indices;
     std::vector<float>  model_coefficients;
     std::vector<float>  normal_coefficients;
@@ -832,7 +966,7 @@ void BuildTrianglesAndAddToVirtualScene(ObjModel* model)
                     normal_coefficients.push_back( 0.0f ); // W
                 }
 
-                if ( model->attrib.texcoords.size() >= (size_t)3*idx.texcoord_index )
+                if ( model->attrib.texcoords.size() >= (size_t)2*idx.texcoord_index )
                 {
                     const float u = model->attrib.texcoords[2*idx.texcoord_index + 0];
                     const float v = model->attrib.texcoords[2*idx.texcoord_index + 1];
@@ -1218,6 +1352,13 @@ void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 //keyboard callback function
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 {
+    //expert mode switch
+    if(key == GLFW_KEY_E && action == GLFW_PRESS) {
+    
+        expertMode = !expertMode;
+        LoadShadersFromFiles();
+    }
+    
     //jump
     if(key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
 
@@ -1321,8 +1462,8 @@ void moveToAngle(float angle) {
   float x = newAcelerateVector[0]/norm(newAcelerateVector);
   float z = newAcelerateVector[2]/norm(newAcelerateVector);
 
-  velocity[0] += x/100;
-  velocity[2] += z/100;
+  velocity[0] += x/10;
+  velocity[2] += z/10;
 
   //modelBallA = modelBallA * Matrix_Translate( velocity[0], 0.0, velocity[2] );
 }
@@ -1332,13 +1473,19 @@ void freeFall(ObjModel *model) {
   //gravity
   velocity[1] += gravity;
 
-  //function that tests intersection using the points algorithm, between models we wil test intersection using de radius
-  if(!verifyIntersectionWithPlaneOk(model) && velocity[1]<0)
-    velocity[1] -= 10*gravity;
-
+  //function that tests intersection using the points algorithm, between models we will test intersection using de radius
+  if(!verifyIntersectionWithPlaneOk(model) && velocity[1]<0) {
+    velocity[1] = 0;
+    modelBallA[3][1] = 1;
+    
+    
+    //velocity[1] -= 10*gravity;
+    }
   glm::vec4 verticalVelocity = glm::vec4(0.0, velocity[1], 0.0, 0.0);
   glm::vec4 verticalVelocityModelCoordinates = changeBase(modelBallA, verticalVelocity);
   modelBallA = modelBallA * Matrix_Translate(verticalVelocityModelCoordinates[0], verticalVelocityModelCoordinates[1], verticalVelocityModelCoordinates[2]);
+
+
 }
 
 glm::vec4 changeBase(glm::mat4 matrix, glm::vec4 vector) {
@@ -1347,6 +1494,10 @@ glm::vec4 changeBase(glm::mat4 matrix, glm::vec4 vector) {
   glm::vec4 output = inverse * vector;
 
   return output;
+}
+
+float mod(glm::vec3 vec) {
+    return sqrt(pow(vec[0],2) + pow(vec[1],2) + pow(vec[2],2)); 
 }
 
 void performAllFoces(ObjModel *model) {
@@ -1358,14 +1509,16 @@ void performAllFoces(ObjModel *model) {
   if(goingLeft)         moveToAngle(-PI/2);
 
   //friction
-  velocity[0] = velocity[0]/1.05;
-  velocity[2] = velocity[2]/1.05;
+  velocity[0] = velocity[0]/1.105;
+  velocity[2] = velocity[2]/1.105;
 
+    float sizeVec = mod(velocity);
+    //std::cout << sizeVec << "\n";
   if(isModelsTouchingEachOther()) {
 
-    velocity[0] = -velocity[0];
-    velocity[1] = -velocity[1];
-    velocity[2] = -velocity[2];
+    velocity[0] = (modelBallA[3][0] - modelBallB[3][0]) * sizeVec;
+    velocity[1] = (modelBallA[3][1] - modelBallB[3][1]) * sizeVec; 
+    velocity[2] = (modelBallA[3][2] - modelBallB[3][2]) * sizeVec;
   }
 
   //take out the gravity velocity
@@ -1387,5 +1540,49 @@ void performAllFoces(ObjModel *model) {
   //gravity function
   freeFall(model);
 }
+
+void TextRendering_ShowFramesPerSecond(GLFWwindow* window)//usar essa funçao pra abilitar e desabilitar o expertMode
+{
+    if ( !g_ShowInfoText )
+        return;
+
+
+    // Variáveis estáticas (static) mantém seus valores entre chamadas
+    // subsequentes da função!
+    static float old_seconds = (float)glfwGetTime();
+    static int   ellapsed_frames = 0;
+    static char  buffer[100] = "?? fps";
+    static int   numchars = 7;
+
+    ellapsed_frames += 1;
+
+    // Recuperamos o número de segundos que passou desde a execução do programa
+    float seconds = (float)glfwGetTime();
+
+    // Número de segundos desde o último cálculo do fps
+    float ellapsed_seconds = seconds - old_seconds;
+
+    if ( ellapsed_seconds > 1.0f )
+    {
+        //numchars = 
+        
+        old_seconds = seconds;
+        ellapsed_frames = 0;
+        
+        currentTime ++;
+    }
+
+    float lineheight = TextRendering_LineHeight(window);
+    float charwidth = TextRendering_CharWidth(window);
+    snprintf(buffer,100 , "GET THE BUNNY");
+    TextRendering_PrintString(window, buffer,-0.9f, 0.9f, 1.0f);
+    snprintf(buffer, 100, "BEST TIME: %d seconds", bestTime);
+    TextRendering_PrintString(window, buffer,-0.9f, 0.8f, 1.0f);
+    snprintf(buffer, 100, "CURRENT TIME: %d seconds", currentTime);
+    TextRendering_PrintString(window, buffer,-0.9f, 0.7f, 1.0f);        
+
+    //TextRendering_PrintString(window, buffer, 1.0f-(numchars + 1)*charwidth, 1.0f-lineheight, 1.0f);
+}
+
 // set makeprg=cd\ ..\ &&\ make\ run\ >/dev/null
 // vim: set spell spelllang=pt_br :

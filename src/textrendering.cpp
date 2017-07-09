@@ -146,6 +146,8 @@ float textscale = 1.5f;
 
 void TextRendering_PrintString(GLFWwindow* window, const std::string &str, float x, float y, float scale = 1.0f)
 {
+    //printf("%s\n", str.c_str());
+    
     scale *= textscale;
     int width, height;
     glfwGetWindowSize(window, &width, &height);

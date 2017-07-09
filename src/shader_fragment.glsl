@@ -22,6 +22,8 @@ uniform mat4 projection;
 #define SPHERE 0
 #define BUNNY  1
 #define PLANE  2
+#define COW 3
+
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -32,6 +34,7 @@ uniform vec4 bbox_max;
 uniform sampler2D TextureImage0;
 uniform sampler2D TextureImage1;
 uniform sampler2D TextureImage2;
+uniform sampler2D TextureImage3;
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec3 color;
@@ -67,6 +70,9 @@ void main()
     // Coordenadas de textura U e V
     float U = 0.0;
     float V = 0.0;
+    
+    vec3 kd0 = vec3(0.0, 0.0, 0.0);
+    vec3 kd1 = vec3(0.0, 0.0, 0.0);
 
     if ( object_id == SPHERE )
     {
@@ -91,45 +97,29 @@ void main()
 
         U = angleO/(2*M_PI);
         V = (angleThe + M_PI/2.0)/M_PI;
+        
+        kd0 = texture(TextureImage0, vec2(U,V)).rgb;
+        kd1 = texture(TextureImage1, vec2(U,V)).rgb;
+        // Equação de Iluminação
+        float lambert = max(0,dot(n,l));
+        float lambert2 = max(0, dot(-n,l));
+
+        color = kd0 * (lambert + 0.01) + kd1 * pow(lambert2, 0.2);
+
+        // Cor final com correção gamma, considerando monitor sRGB.
+        // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas
+        color = pow(color, vec3(1.0,1.0,1.0)/2.2);
     }
-    else if ( object_id == BUNNY )
-    {
-        // PREENCHA AQUI as coordenadas de textura do coelho, computadas com
-        // projeção planar XY em COORDENADAS DO MODELO. Utilize como referência
-        // o slide 106 do documento "Aula_20_e_21_Mapeamento_de_Texturas.pdf".
-        float minx = bbox_min.x;
-        float maxx = bbox_max.x;
-
-        float miny = bbox_min.y;
-        float maxy = bbox_max.y;
-
-        float minz = bbox_min.z;
-        float maxz = bbox_max.z;
-
-        // Utilize as variáveis min*/max* definidas acima para normalizar as
-        // coordenadas de textura U e V dentro do intervalo [0,1]. Veja 149
-        // do documento "Aula_20_e_21_Mapeamento_de_Texturas.pdf".
-        U =(position_model.x-minx)/(maxx-minx);// 0.0;
-        V =(position_model.y-miny)/(maxy-miny);//0.0;
-    }
-    else if ( object_id == PLANE )
+    else if ( object_id == PLANE  || object_id == COW)
     {
         // Coordenadas de textura do plano,i
         // obtidas do arquivo OBJ.
         U = texcoords.x;
         V = texcoords.y;
+        
+        kd0 = texture(TextureImage2, vec2(U,V)).rgb;
+        color = kd0;        
     }
-
-    // Obtemos a refletância difusa a partir da leitura da imagem TextureImage0
-    vec3 Kd0 = texture(TextureImage0, vec2(U,V)).rgb;
-    vec3 Kd1 = texture(TextureImage1, vec2(U,V)).rgb;
-    // Equação de Iluminação
-    float lambert = max(0,dot(n,l));
-    float lambert2 = max(0, dot(-n,l));
-
-    color = Kd0 * (lambert + 0.01) + Kd1 * pow(lambert2, 0.2);
-
-    // Cor final com correção gamma, considerando monitor sRGB.
-    // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas
-    color = pow(color, vec3(1.0,1.0,1.0)/2.2);
+    
+    
 }
